@@ -128,13 +128,25 @@ function startTekst(iso) {
   return `Reageren vanaf ${dag}, ${tijd}`;
 }
 
+// Verstuurt een melding; probeert het tot 3 keer. Geeft true terug als het lukte.
 async function stuur(msg) {
-  const res = await fetch(NTFY_SERVER, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ topic: TOPIC, ...msg }),
-  });
-  if (!res.ok) console.warn(`ntfy gaf status ${res.status}: ${await res.text()}`);
+  for (let poging = 1; poging <= 3; poging++) {
+    try {
+      const res = await fetch(NTFY_SERVER, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ topic: TOPIC, ...msg }),
+        signal: AbortSignal.timeout(20000),
+      });
+      if (res.ok) return true;
+      console.warn(`ntfy gaf status ${res.status}: ${await res.text()}`);
+      if (res.status < 500 && res.status !== 429) return false; // opnieuw proberen heeft geen zin
+    } catch (e) {
+      console.warn(`ntfy niet bereikbaar (poging ${poging}/3): ${e.cause?.code || e.name || e.message}`);
+    }
+    if (poging < 3) await new Promise((r) => setTimeout(r, poging * 5000));
+  }
+  return false;
 }
 
 function meldingVoor(i) {
@@ -186,10 +198,15 @@ async function main() {
   const nieuw = items.filter((i) => !gezien.has(i.id));
   const passend = nieuw.filter(past);
   console.log(`${items.length} woningen, ${nieuw.length} nieuw, ${passend.length} passend.`);
+  console.log(
+    `Filters: gebieden=${GEBIEDEN.length ? GEBIEDEN.join(" | ") : "(alle)"}, max huur=${MAX_HUUR || "(geen)"}, ` +
+      `min slaapkamers=${MIN_SLPK || "(geen)"}, zonder leeftijdseis=${ZONDER_LEEFTIJD ? "ja" : "nee"}`
+  );
 
+  let verstuurd = true;
   if (!state) {
     const nu = items.filter(past).length;
-    await stuur({
+    verstuurd = await stuur({
       title: "Woonnet-meldingen staan aan",
       message: `Ik houd ${items.length} woningen in de gaten, waarvan ${nu} nu al bij je filters passen. Voortaan krijg je alleen een melding bij nieuwe woningen.`,
       tags: ["white_check_mark"],
@@ -198,7 +215,7 @@ async function main() {
   } else if (passend.length > 5) {
     const regels = passend.slice(0, 8).map((i) => `${euro(i.rent)}  ${i.address}, ${i.buurt || i.city}`);
     if (passend.length > 8) regels.push(`en nog ${passend.length - 8}`);
-    await stuur({
+    verstuurd = await stuur({
       title: `${passend.length} nieuwe woningen op Woonnet`,
       message: regels.join("\n"),
       tags: ["house"],
@@ -206,7 +223,13 @@ async function main() {
       click: APP_URL || SITE,
     });
   } else {
-    for (const i of passend) await stuur(meldingVoor(i));
+    for (const i of passend) verstuurd = (await stuur(meldingVoor(i))) && verstuurd;
+  }
+
+  if (!verstuurd) {
+    // Niets opslaan: de volgende run probeert dezelfde woningen opnieuw te melden.
+    console.log("::warning title=Melding niet verstuurd::ntfy.sh was niet bereikbaar. De volgende run probeert het opnieuw.");
+    return;
   }
 
   // Alleen opslaan als de lijst veranderd is (voorkomt een commit elk kwartier).
