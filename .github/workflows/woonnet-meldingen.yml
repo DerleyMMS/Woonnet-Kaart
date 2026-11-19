@@ -1,1 +1,45 @@
+name: Woonnet meldingen
 
+on:
+  schedule:
+    - cron: "*/15 * * * *" # elk kwartier (GitHub kan soms wat later zijn)
+  workflow_dispatch: # handmatig starten via de knop "Run workflow"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: woonnet-meldingen
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Nieuwe woningen zoeken en melden
+        run: node woonnet-check.mjs
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          GEBIEDEN: ${{ vars.GEBIEDEN }}
+          MAX_HUUR: ${{ vars.MAX_HUUR }}
+          MIN_SLAAPKAMERS: ${{ vars.MIN_SLAAPKAMERS }}
+          ZONDER_LEEFTIJDSEIS: ${{ vars.ZONDER_LEEFTIJDSEIS }}
+          APP_URL: ${{ vars.APP_URL }}
+      - name: Onthouden welke woningen al gemeld zijn
+        run: |
+          git config user.name "woonnet-meldingen"
+          git config user.email "woonnet-meldingen@users.noreply.github.com"
+          [ -f woonnet-gezien.json ] || exit 0
+          git add woonnet-gezien.json
+          if git diff --cached --quiet; then
+            echo "Geen veranderingen."
+          else
+            git commit -m "Woonnet: gemelde woningen bijgewerkt"
+            git pull --rebase --quiet
+            git push
+          fi
