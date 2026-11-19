@@ -1,0 +1,36 @@
+Woonnet kaart – web-app voor je iPhone
+======================================
+
+Wat je krijgt
+Een app-icoon op je beginscherm. De app opent schermvullend met:
+lijst per wijk, kaart, filters en favoriete gebieden. Reageren doe je via
+"Bekijk advertentie" (opent de advertentie op Woonnet).
+
+1. Online zetten met GitHub Pages (eenmalig, ±5 minuten, gratis)
+   a. Ga naar github.com, log in, klik rechtsboven op "+" → "New repository".
+   b. Naam: woonnet-kaart · zet hem op "Public" · klik "Create repository".
+   c. Klik op de link "uploading an existing file".
+   d. Sleep ALLE bestanden uit deze map erin (index.html, app.js,
+      manifest.webmanifest, icon-180.png, icon-192.png, icon-512.png;
+      LEESMIJ.txt mag ook) → klik "Commit changes".
+   e. Ga naar Settings → Pages. Bij "Build and deployment":
+      Source = "Deploy from a branch", Branch = "main" en map "/ (root)" → Save.
+   f. Na 1–2 minuten staat bovenaan die pagina je adres:
+      https://JOUW-GEBRUIKERSNAAM.github.io/woonnet-kaart/
+
+2. Op je iPhone zetten
+   a. Open dat adres in Safari (of Chrome).
+   b. Tik op de Deel-knop (vierkantje met pijl omhoog) → "Zet op beginscherm".
+   c. Open de app via het nieuwe icoon.
+   d. Tik op ⚙️ en vul je favoriete gebieden in, bijvoorbeeld:
+      Hillegersberg, Schiebroek, Berkel en Rodenrijs, Bergschenhoek
+
+Goed om te weten
+- Je favorieten en filters worden alleen op je telefoon bewaard, niet in de
+  code. In de openbare GitHub-map staat dus niets persoonlijks.
+- De pagina staat op "noindex", zodat zoekmachines hem niet tonen.
+- Het aanbod wordt 10 minuten onthouden; open je de app later opnieuw, dan
+  ververst hij vanzelf. "↻ Vernieuwen" (onder Filters) kan altijd.
+- Bijwerken: vervang app.js in de GitHub-map en verhoog in index.html
+  "app.js?v=1" naar "?v=2", zodat je telefoon de nieuwe versie laadt.
+- Als Woonnet zijn systeem ombouwt, kan de app stoppen met werken.
