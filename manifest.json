@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Woonnet Rijnmond – kaart & overzicht",
+  "version": "2.2.0",
+  "description": "Kaartweergave, overzicht per wijk, extra filters en wijklabels voor Woonnet Rijnmond.",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.woonnetrijnmond.nl/*",
+        "https://woonnetrijnmond.nl/*"
+      ],
+      "js": ["overzicht.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    }
+  ]
+}
