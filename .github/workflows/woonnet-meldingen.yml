@@ -24,6 +24,7 @@ jobs:
       - name: Nieuwe woningen zoeken en melden
         run: node woonnet-check.mjs
         env:
+          NODE_OPTIONS: --dns-result-order=ipv4first
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           GEBIEDEN: ${{ vars.GEBIEDEN }}
           MAX_HUUR: ${{ vars.MAX_HUUR }}
