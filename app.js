@@ -156,6 +156,15 @@
     return str.replace(/_/g, " ").toLowerCase();
   }
 
+  // Publicatie-id is base64 van "HousingPublication:<oplopend nummer>".
+  function pubNum(id) {
+    try {
+      return parseInt(atob(id).split(":").pop(), 10) || 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   function normalize(node) {
     const u = node.unit || {};
     const loc = u.location || {};
@@ -167,6 +176,7 @@
     const beds = u.numberOfBedrooms ? u.numberOfBedrooms.exact || u.numberOfBedrooms.min || 0 : 0;
     return {
       id: node.id,
+      pub: pubNum(node.id),
       slug: u.slug?.value || "",
       address: loc.addressLine1 || "",
       city,
@@ -873,6 +883,7 @@
   .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
   .tag{padding:3px 8px;border-radius:6px;background:var(--water-soft);color:var(--water);font-size:12px;font-weight:600;line-height:1.35}
   .tag.age{background:var(--sun-soft);color:var(--sun-ink)}
+  .city .day{font:500 14px/1 system-ui,sans-serif;color:var(--ink3)}
   .tag.soft{background:var(--bg);color:var(--ink2);font-weight:500}
   .go{flex:none;align-self:flex-start;width:36px;height:36px;margin:-6px -8px 0 0;border-radius:10px;display:grid;place-items:center;color:var(--ink3)}
   .go:hover{background:var(--bg);color:var(--ink)}
@@ -1075,7 +1086,9 @@
       prijs: (a, b) => rentOf(a) - rentOf(b),
       prijsAf: (a, b) => rentOf(b) - rentOf(a),
       m2: (a, b) => (b.m2 || 0) - (a.m2 || 0),
-      start: (a, b) => String(a.start).localeCompare(String(b.start)),
+      nieuw: (a, b) => String(b.start).localeCompare(String(a.start)) || (b.pub || 0) - (a.pub || 0),
+      oud: (a, b) => String(a.start).localeCompare(String(b.start)) || (a.pub || 0) - (b.pub || 0),
+      plaats: (a, b) => a.city.localeCompare(b.city, "nl") || a.address.localeCompare(b.address, "nl", { numeric: true }),
     };
     out.sort(sorters[filters.sort] || sorters.wijk);
     return out;
@@ -1111,6 +1124,7 @@
             <button class="filterbtn" data-act="filters">${I.sliders}<span>Filters</span><span class="badge"></span></button>
           </div>
           <div class="quick">
+            <button class="qchip" data-quick="nieuw">Nieuwste eerst</button>
             <button class="qchip fav" data-quick="favOnly">${I.star}Favorieten</button>
             <button class="qchip" data-quick="beds2">2+ slaapkamers</button>
             <button class="qchip" data-quick="balcony">Balkon</button>
@@ -1153,11 +1167,13 @@
             </div>
             <label class="field"><span>Sorteren</span>
               <select class="inp" data-f="sort">
+                <option value="nieuw">Nieuwste eerst</option>
+                <option value="oud">Oudste eerst</option>
+                <option value="plaats">Op plaats, A tot Z</option>
                 <option value="wijk">Per wijk, goedkoopste eerst</option>
                 <option value="prijs">Huur, laag naar hoog</option>
                 <option value="prijsAf">Huur, hoog naar laag</option>
                 <option value="m2">Grootste eerst</option>
-                <option value="start">Reageerdatum</option>
               </select>
             </label>
             <div class="fs-meta"><span class="updated"></span><button class="linkbtn" data-act="refresh">${I.refresh}Ververs aanbod</button></div>
@@ -1226,6 +1242,7 @@
         if (quick === "beds2") filters.minBeds = filters.minBeds === "2" ? "0" : "2";
         if (quick === "noage") filters.doelgroep = filters.doelgroep === "geen" ? "" : "geen";
         if (quick === "loting") filters.model = filters.model === "WoningLoting" ? "" : "WoningLoting";
+        if (quick === "nieuw") filters.sort = filters.sort === "nieuw" ? "wijk" : "nieuw";
         saveFilters();
         return render(true);
       }
@@ -1310,7 +1327,10 @@
     if (!overlay || !data) return;
     const o = overlay;
     const all = data.items;
-    for (const i of all) i.fav = isFav(i.line3 || i.city); // favorieten kunnen veranderd zijn
+    for (const i of all) {
+      i.fav = isFav(i.line3 || i.city); // favorieten kunnen veranderd zijn
+      if (i.pub === undefined) i.pub = pubNum(i.id);
+    }
 
     // Keuzelijsten vullen
     const cities = uniq(all.map((i) => i.city));
@@ -1337,6 +1357,7 @@
       beds2: filters.minBeds === "2",
       noage: filters.doelgroep === "geen",
       loting: filters.model === "WoningLoting",
+      nieuw: filters.sort === "nieuw",
     };
     o.root.querySelectorAll("[data-quick]").forEach((b) => b.classList.toggle("on", !!quickOn[b.dataset.quick]));
 
@@ -1382,6 +1403,19 @@
       return;
     }
     const scroll = o.list.scrollTop;
+    if (filters.sort === "nieuw" || filters.sort === "oud" || filters.sort === "plaats") {
+      const groepen = new Map();
+      for (const i of lastFiltered) {
+        const k = filters.sort === "plaats" ? { key: i.city, titel: i.city, sub: "" } : dagLabel(i.start);
+        if (!groepen.has(k.key)) groepen.set(k.key, { ...k, items: [] });
+        groepen.get(k.key).items.push(i);
+      }
+      o.list.innerHTML = [...groepen.values()]
+        .map((g) => `<h2 class="city">${esc(g.titel)}${g.sub ? `<span class="day">${esc(g.sub)}</span>` : ""}<small>${g.items.length}</small></h2>${g.items.map(itemHtml).join("")}`)
+        .join("");
+      o.list.scrollTop = scroll;
+      return;
+    }
     if (filters.sort !== "wijk") {
       o.list.innerHTML = lastFiltered.map(itemHtml).join("");
       o.list.scrollTop = scroll;
@@ -1416,6 +1450,17 @@
     }
     o.list.innerHTML = html;
     o.list.scrollTop = scroll;
+  }
+
+  // Kop per publicatiedag: Vandaag / Morgen / Gisteren / datum.
+  function dagLabel(iso) {
+    const d = new Date(iso);
+    if (!iso || isNaN(d)) return { key: "onbekend", titel: "Overig", sub: "" };
+    const dag = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const diff = Math.round((dag(d) - dag(new Date())) / 864e5);
+    const sub = d.toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" });
+    const titel = diff === 0 ? "Vandaag" : diff === 1 ? "Morgen" : diff === -1 ? "Gisteren" : sub;
+    return { key: String(dag(d)), titel, sub: titel === sub ? "" : sub };
   }
 
   function setStatus(html) {
